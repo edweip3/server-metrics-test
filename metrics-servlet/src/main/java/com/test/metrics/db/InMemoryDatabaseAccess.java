@@ -2,6 +2,8 @@ package com.test.metrics.db;
 
 import com.google.inject.Singleton;
 import com.test.metrics.model.ClientEventData;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * In memory implementation of the {@link DataAccess} interface.
@@ -9,17 +11,19 @@ import com.test.metrics.model.ClientEventData;
 @Singleton
 public class InMemoryDatabaseAccess implements DatabaseAccess
 {
+    //in memory db
+    Map<String, ClientEventData> db = new HashMap<String, ClientEventData>();
+    
     @Override
     public void storeEvent(ClientEventData event)
     {
-        // TODO: implement
-        throw new UnsupportedOperationException("implement me");
+        
+        db.put(event.getEventId(), event);
     }
 
     @Override
     public ClientEventData retrieveEvent(String eventId)
     {
-        // TODO: implement
-        throw new UnsupportedOperationException("implement me");
+        return db.get(eventId);
     }
 }

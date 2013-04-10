@@ -10,6 +10,13 @@ enum ClientEventType
     USER_REGISTERED = 2;
 }
 
+message KeyValueData
+{
+    // key and value attributes:
+    required string key = 1;
+    required string value = 2;
+}
+
 // Representing a single event.
 message ClientEventData
 {
@@ -21,7 +28,8 @@ message ClientEventData
     // arbitrary data
     optional string data = 4;
 
-    // TODO: allow arbitrary key-value pairs
+    // allow arbitrary key-value pairs
+    repeated KeyValueData keyvalue_data = 5;
 }
 
 // The message uploaded to the server - containing multiple events

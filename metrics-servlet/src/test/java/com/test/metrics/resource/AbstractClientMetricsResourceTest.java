@@ -11,7 +11,9 @@ import com.test.metrics.jersey.JerseyProtostuff;
 import com.test.metrics.model.ClientEventData;
 import com.test.metrics.model.ClientEventType;
 import com.test.metrics.model.ClientEventUploadRequest;
+import com.test.metrics.model.KeyValueData;
 import java.io.InputStream;
+import java.util.List;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import static org.junit.Assert.*;
@@ -99,4 +101,101 @@ public abstract class AbstractClientMetricsResourceTest extends AbstractGuiceJer
         assertEquals(Response.Status.OK.getStatusCode(), getResponse.getStatus());
         assertTrue(getResponse.getHeaders().getFirst("Content-Type").contains(MediaType.APPLICATION_JSON));
     }
+    
+    @Test
+    public void test_GetJson_NonNumericId()
+    {
+        log.trace("test_GetJson_NonNumericId");
+
+        ClientResponse getResponse = resource().path(getRootResourceUrl() + "/abc").accept(MediaType.APPLICATION_JSON).get(ClientResponse.class);
+        assertEquals(Response.Status.NOT_FOUND.getStatusCode(), getResponse.getStatus());
+        assertTrue(getResponse.getHeaders().getFirst("Content-Type").contains(MediaType.APPLICATION_JSON));
+       
+    }
+    
+    @Test
+    public void test_Protobuf_NonNumericId()
+    {
+        log.trace("test_GetProtobuf_NonNumericId");
+
+        ClientResponse getResponse = resource().path(getRootResourceUrl() + "/abc").accept(JerseyProtostuff.APPLICATION_PROTOBUF).get(ClientResponse.class);
+        assertEquals(Response.Status.NOT_FOUND.getStatusCode(), getResponse.getStatus());
+        assertTrue(getResponse.getHeaders().getFirst("Content-Type").contains(JerseyProtostuff.APPLICATION_PROTOBUF));
+       
+    }
+    
+    
+    @Test
+    public void test_PostJson_MultiEvents()
+    {
+        log.trace("test_PostJson_MultiEvents");
+        
+        long currentTime = System.currentTimeMillis() / 1000L;
+        
+        ClientEventUploadRequest uploadRequest = new ClientEventUploadRequest("1", "Android");
+        uploadRequest.addEvents(new ClientEventData("1", ClientEventType.UNKNOWN, currentTime));
+        uploadRequest.addEvents(new ClientEventData("2", ClientEventType.USER_REGISTERED, currentTime));
+
+        byte[] bytes = JsonIOUtil.toByteArray(uploadRequest, ClientEventUploadRequest.getSchema(), false);
+
+        ClientResponse postResponse = resource().path(getRootResourceUrl()).type(MediaType.APPLICATION_JSON).post(ClientResponse.class, bytes);
+        assertEquals(Response.Status.OK.getStatusCode(), postResponse.getStatus());
+
+        ClientEventData event = dbAccess.retrieveEvent("1");
+        assertNotNull("Event 1 was not stored.", event);
+        assertEquals("1", event.getEventId());
+        assertEquals(ClientEventType.UNKNOWN, event.getEventType());
+        assertEquals(currentTime, event.getTimestamp().longValue());
+        
+        ClientEventData event2 = dbAccess.retrieveEvent("2");
+        assertNotNull("Event 2 was not stored.", event2);
+        assertEquals("2", event2.getEventId());
+        assertEquals(ClientEventType.USER_REGISTERED, event2.getEventType());
+        assertEquals(currentTime, event2.getTimestamp().longValue());
+    }
+    
+    @Test
+    public void test_PostJson_EmptyBody()
+    {
+        log.trace("test_PostJson_EmptyBody");
+      
+        byte[] bytes = null;
+
+        ClientResponse postResponse = resource().path(getRootResourceUrl()).type(MediaType.APPLICATION_JSON).post(ClientResponse.class, bytes);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), postResponse.getStatus());
+
+    }
+    
+    @Test
+    public void test_PostJson_KeyValue()
+    {
+        log.trace("test_PostJson_KeyValue");
+        
+        long currentTime = System.currentTimeMillis() / 1000L;
+        
+        ClientEventUploadRequest uploadRequest = new ClientEventUploadRequest("1", "Android");
+        ClientEventData event = new ClientEventData("1", ClientEventType.UNKNOWN, currentTime);
+        event.addKeyvalueData(new KeyValueData("key1","value1"));
+        
+        uploadRequest.addEvents(event);
+        
+        byte[] bytes = JsonIOUtil.toByteArray(uploadRequest, ClientEventUploadRequest.getSchema(), false);
+
+        ClientResponse postResponse = resource().path(getRootResourceUrl()).type(MediaType.APPLICATION_JSON).post(ClientResponse.class, bytes);
+        assertEquals(Response.Status.OK.getStatusCode(), postResponse.getStatus());
+
+        ClientEventData eventFromDB = dbAccess.retrieveEvent("1");
+        assertNotNull("Event 1 was not stored.", event);
+        assertEquals("1", event.getEventId());
+        assertEquals(ClientEventType.UNKNOWN, event.getEventType());
+        assertEquals(currentTime, event.getTimestamp().longValue());
+        List<KeyValueData> kvData = eventFromDB.getKeyvalueDataList();
+        
+        assertNotNull("Keyvalue is null", kvData);
+        assertEquals(1, kvData.size());
+        assertEquals("key1", kvData.get(0).getKey());
+        assertEquals("value1", kvData.get(0).getValue());
+        
+    }
+    
 }
